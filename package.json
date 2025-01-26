@@ -29,6 +29,7 @@
     "@react-aria/visually-hidden": "3.8.12",
     "@react-types/shared": "3.26.0",
     "@tanstack/react-query": "^5.64.2",
+    "@web3icons/react": "^3.16.0",
     "clsx": "2.1.1",
     "ethers": "^6.13.5",
     "framer-motion": "11.15.0",
