@@ -11,9 +11,10 @@ import { motion } from "framer-motion";
 
 export const Navbar = () => {
   const [activeTab, setActiveTab] = useState(window.location.pathname);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   return (
-    <HeroUINavbar maxWidth="full" position="sticky" className="bg-transparent">
+    <HeroUINavbar maxWidth="full" position="sticky" className="bg-transparent" isMenuOpen={isMenuOpen} onMenuOpenChange={setIsMenuOpen}>
       <NavbarContent className="basis-1/5 sm:basis-full hidden sm:block" justify="start">
         <div className="relative flex items-center border border-gray-600 rounded-full w-fit">
           <div className="realtive flex p-1">
@@ -61,7 +62,7 @@ export const Navbar = () => {
 
       <NavbarContent className="sm:hidden basis-1 pl-4">
         <div className="flex justify-between items-center w-full">
-          <NavbarMenuToggle className="p-5 -ml-5"/>
+          <NavbarMenuToggle className="p-5 -ml-5" />
           <div className="flex flex-row gap-3">
             <Link isExternal href={siteConfig.links.docs} title="Docs">
               <BookText className="text-default-500 h-5 w-5" />
@@ -74,23 +75,27 @@ export const Navbar = () => {
         </div>
       </NavbarContent>
 
-      <NavbarMenu className="z-50 absolute inset-0 full-height">
-        <div className="mx-4 flex-col gap-5 flex-grow inline-flex pt-10">
-          {siteConfig.navMenuItems.map((item, index) => (
-            <NavbarMenuItem key={`${item}-${index}`}>
-              <Link
-                className={clsx(
-                  "border-l-2 pl-5 h-10",
-                  activeTab === item.href ? "border-primary text-primary" : "border-transparent"
-                )}
-                color="foreground"
-                href={item.href}
-                size="lg"
-              >
-                {item.label}
-              </Link>
-            </NavbarMenuItem>
-          ))}
+      <NavbarMenu className="z-20 absolute inset-0 full-height">
+        <div className="mx-4 flex-col gap-5 flex-grow inline-flex justify-between py-10">
+          <div className="inline-flex flex-col gap-5">
+            {siteConfig.navMenuItems.map((item, index) => (
+              <NavbarMenuItem key={`${item}-${index}`}>
+                <Link
+                  className={clsx(
+                    "border-l-2 pl-5 h-10",
+                    activeTab === item.href ? "border-primary text-primary" : "border-transparent"
+                  )}
+                  color="foreground"
+                  href={item.href}
+                  size="lg"
+                  onPress={() => setIsMenuOpen(false)}
+                >
+                  {item.label}
+                </Link>
+              </NavbarMenuItem>
+            ))}
+          </div>
+          <ButtonConnectWallet setIsMenuOpen={setIsMenuOpen} />
         </div>
       </NavbarMenu>
     </HeroUINavbar>

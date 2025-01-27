@@ -46,12 +46,18 @@ const GradientButton = ({ children, onClick, variant = 'bordered' }: {
   </div>
 );
 
-export function ButtonConnectWallet() {
-  return <ConnectButtonWalletComponents />;
+export function ButtonConnectWallet({ setIsMenuOpen }: { setIsMenuOpen?: (isOpen: boolean) => void }) {
+  return <ConnectButtonWalletComponents setIsMenuOpen={setIsMenuOpen}/>;
 }
 
-export const ConnectButtonWalletComponents = () => {
+export const ConnectButtonWalletComponents = ({ setIsMenuOpen }: { setIsMenuOpen?: (isOpen: boolean) => void }) => {
   const { balances, error } = useBalance();
+
+  const handleCloseMenu = () => {
+    if (setIsMenuOpen) {
+      setIsMenuOpen(false)
+    }
+  };
 
   return (
     <ConnectButton.Custom>
@@ -80,7 +86,7 @@ export const ConnectButtonWalletComponents = () => {
 
         if (!connected) {
           return (
-            <GradientButton onClick={openConnectModal} variant="ghost">
+            <GradientButton onClick={() => { openConnectModal(); handleCloseMenu(); }} variant="ghost">
               Connect Wallet
             </GradientButton>
           );
@@ -88,7 +94,7 @@ export const ConnectButtonWalletComponents = () => {
 
         if (chain?.unsupported) {
           return (
-            <GradientButton onClick={openChainModal}>
+            <GradientButton onClick={() => { openChainModal(); handleCloseMenu(); }}>
               Wrong network
             </GradientButton>
           );
@@ -96,7 +102,7 @@ export const ConnectButtonWalletComponents = () => {
 
         return (
           <div className="w-fit flex-wrap flex gap-3 z-50">
-            <GradientButton>
+            <GradientButton onClick={handleCloseMenu}>
               {chain.hasIcon && (
                 <ChainIcon
                   iconUrl={chain.iconUrl}
@@ -112,7 +118,7 @@ export const ConnectButtonWalletComponents = () => {
               )}
             </GradientButton>
 
-            <GradientButton onClick={openChainModal}>
+            <GradientButton onClick={() => { openChainModal(); handleCloseMenu(); }}>
               {chain.hasIcon && (
                 <ChainIcon
                   iconUrl={chain.iconUrl}
@@ -123,7 +129,7 @@ export const ConnectButtonWalletComponents = () => {
               {chain.name}
             </GradientButton>
 
-            <GradientButton onClick={openAccountModal}>
+            <GradientButton onClick={() => { openAccountModal(); handleCloseMenu(); }}>
               {account.displayName}
               {account.displayBalance && ` (${account.displayBalance})`}
             </GradientButton>

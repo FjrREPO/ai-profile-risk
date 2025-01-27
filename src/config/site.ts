@@ -23,7 +23,7 @@ export const siteConfig = {
       href: "/home",
     },
     {
-      label: "Genearte",
+      label: "Generate",
       href: "/generate",
     },
     {
