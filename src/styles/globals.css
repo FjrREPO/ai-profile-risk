@@ -51,6 +51,20 @@
   font-style: normal;
 }
 
-body {
+* {
   font-family: 'FilsonPro', sans-serif;
+}
+
+.full-height {
+  height: 100vh !important;
+}
+
+@layer base {
+  :root {
+    --gray1: 0 0% 98%;
+  }
+
+  .dark {
+    --gray1: 225 12% 7%;
+  }
 }

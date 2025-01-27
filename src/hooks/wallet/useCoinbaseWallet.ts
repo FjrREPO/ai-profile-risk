@@ -1,45 +1,9 @@
-import { useCallback, useState } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { createCoinbaseWalletSDK } from "@coinbase/wallet-sdk";
+import { SUPPORTED_NETWORKS } from "@/lib/constants";
 
 const APP_NAME = "CoinConnect";
-
-const SUPPORTED_NETWORKS = {
-  "42161": {
-    name: "Arbitrum One",
-    chainId: "0xa4b1",
-    rpcUrl: "https://arb-mainnet.g.alchemy.com/v2/vwDTCZX0XZnU6flxj8YzYZuMaOKI3EX9"
-  },
-  "43114": {
-    name: "Avalanche C-Chain",
-    chainId: "0xa86a",
-    rpcUrl: "https://avax-mainnet.g.alchemy.com/v2/vwDTCZX0XZnU6flxj8YzYZuMaOKI3EX9"
-  },
-  "8453": {
-    name: "Base",
-    chainId: "0x2105",
-    rpcUrl: "https://base-mainnet.g.alchemy.com/v2/vwDTCZX0XZnU6flxj8YzYZuMaOKI3EX9"
-  },
-  "56": {
-    name: "BNB Smart Chain",
-    chainId: "0x38",
-    rpcUrl: "https://bnb-mainnet.g.alchemy.com/v2/vwDTCZX0XZnU6flxj8YzYZuMaOKI3EX9"
-  },
-  "1": {
-    name: "Ethereum Mainnet",
-    chainId: "0x1",
-    rpcUrl: `https://eth-mainnet.g.alchemy.com/v2/vwDTCZX0XZnU6flxj8YzYZuMaOKI3EX9`
-  },
-  "10": {
-    name: "OP Mainnet",
-    chainId: "0xa",
-    rpcUrl: "https://opt-mainnet.g.alchemy.com/v2/vwDTCZX0XZnU6flxj8YzYZuMaOKI3EX9"
-  },
-  "137": {
-    name: "Polygon Mainnet",
-    chainId: "0x89",
-    rpcUrl: "https://polygon-mainnet.g.alchemy.com/v2/vwDTCZX0XZnU6flxj8YzYZuMaOKI3EX9"
-  },
-} as const;
+const STORAGE_KEY = "wallet_connection_status";
 
 interface NetworkInfo {
   name: string;
@@ -49,7 +13,7 @@ interface NetworkInfo {
 
 interface CoinbaseWalletHook {
   connect: () => Promise<void>;
-  disconnect: () => void;
+  disconnect: () => Promise<void>;
   address: string | null;
   isConnected: boolean;
   error: Error | null;
@@ -65,93 +29,180 @@ export function useCoinbaseWallet(): CoinbaseWalletHook {
   const [chainId, setChainId] = useState<number | null>(null);
   const [supportedNetworks] = useState(SUPPORTED_NETWORKS);
 
-  const connect = useCallback(async () => {
-    try {
-      setError(null);
-      
-      const coinbaseWallet = createCoinbaseWalletSDK({
-        appName: APP_NAME,
-        appLogoUrl: undefined,
-      });
-
-      const ethereum = coinbaseWallet.getProvider();
-      
-      if (!ethereum) {
-        throw new Error("Coinbase Wallet provider not available");
-      }
-
-      const accounts: string[] = await ethereum.request({ method: "eth_requestAccounts" }) as string[];
-
-      if (!accounts) {
-        throw new Error("No Ethereum accounts found");
-      }
-
-      setAddress(accounts[0]);
-      setIsConnected(true);
-
-      const currentChainId = await ethereum.request({
-        method: "eth_chainId",
-      }) as string;
-
-      if (currentChainId) {
-        setChainId(parseInt(currentChainId, 16));
-      }
-    } catch (err) {
-      const processedError = err instanceof Error 
-        ? err 
-        : new Error("Unexpected error during wallet connection");
-      
-      console.error("Wallet Connection Error:", processedError);
-      
-      setError(processedError);
-      setIsConnected(false);
-      setAddress(null);
-      setChainId(null);
-    }
+  // Create a stable reference to the wallet instance
+  const getCoinbaseWallet = useCallback(() => {
+    return createCoinbaseWalletSDK({
+      appName: APP_NAME,
+      appLogoUrl: undefined,
+    });
   }, []);
 
-  const disconnect = useCallback(() => {
+  const resetWalletState = useCallback(() => {
     setIsConnected(false);
     setAddress(null);
     setError(null);
     setChainId(null);
+    localStorage.removeItem(STORAGE_KEY);
   }, []);
 
-  const switchNetwork = useCallback(async (networkKey: keyof typeof SUPPORTED_NETWORKS) => {
+  // Updated connection check with better error handling
+  const checkConnection = useCallback(async () => {
     try {
-      const network = supportedNetworks[networkKey];
-      
-      if (!network) {
-        throw new Error("Unsupported network selected");
+      const ethereum = getCoinbaseWallet().getProvider();
+      if (!ethereum) {
+        throw new Error("Coinbase Wallet provider not available");
       }
 
-      const coinbaseWallet = createCoinbaseWalletSDK({
-        appName: APP_NAME,
-        appLogoUrl: undefined,
-      });
+      const accounts = (await ethereum.request({
+        method: "eth_accounts",
+      })) as string[];
 
-      const ethereum = coinbaseWallet.getProvider();
+      const isActive = accounts && accounts.length > 0;
+      
+      if (isActive) {
+        setAddress(accounts[0]);
+        setIsConnected(true);
+        localStorage.setItem(STORAGE_KEY, accounts[0]);
+
+        const currentChainId = (await ethereum.request({
+          method: "eth_chainId",
+        })) as string;
+
+        setChainId(parseInt(currentChainId, 16));
+      } else {
+        resetWalletState();
+      }
+
+      return isActive;
+    } catch (err) {
+      console.error("Error checking connection:", err);
+      resetWalletState();
+      return false;
+    }
+  }, [getCoinbaseWallet, resetWalletState]);
+
+  // Initialize wallet and set up listeners
+  useEffect(() => {
+    const ethereum = getCoinbaseWallet().getProvider();
+    
+    if (!ethereum) return;
+
+    const handleAccountsChanged = async (accounts: string[]) => {
+      if (accounts.length === 0) {
+        await disconnect();
+      } else {
+        await checkConnection();
+      }
+    };
+
+    const handleChainChanged = (newChainId: string) => {
+      setChainId(parseInt(newChainId, 16));
+    };
+
+    const handleDisconnect = async () => {
+      await disconnect();
+    };
+
+    ethereum.on("accountsChanged", handleAccountsChanged);
+    ethereum.on("chainChanged", handleChainChanged);
+    ethereum.on("disconnect", handleDisconnect);
+
+    // Check initial connection status
+    checkConnection();
+
+    return () => {
+      if (ethereum) {
+        ethereum.removeListener("accountsChanged", handleAccountsChanged);
+        ethereum.removeListener("chainChanged", handleChainChanged);
+        ethereum.removeListener("disconnect", handleDisconnect);
+      }
+    };
+  }, [getCoinbaseWallet, checkConnection]);
+
+  const connect = useCallback(async () => {
+    try {
+      setError(null);
+      const ethereum = getCoinbaseWallet().getProvider();
 
       if (!ethereum) {
-        throw new Error("Ethereum provider unavailable");
+        throw new Error("Coinbase Wallet provider not available");
       }
 
-      await ethereum.request({
-        method: "wallet_switchEthereumChain",
-        params: [{ chainId: network.chainId }],
-      });
+      const accounts = (await ethereum.request({
+        method: "eth_requestAccounts",
+      })) as string[];
 
-      setChainId(parseInt(network.chainId, 16));
-      setError(null);
+      if (!accounts || accounts.length === 0) {
+        throw new Error("No Ethereum accounts found");
+      }
+
+      await checkConnection();
     } catch (err) {
-      const processedError = err instanceof Error 
-        ? err 
-        : new Error("Network switching failed");
-      
-      console.error("Network Switch Error:", processedError);
+      const processedError =
+        err instanceof Error ? err : new Error("Unexpected error during wallet connection");
+      console.error("Wallet Connection Error:", processedError);
+      resetWalletState();
       setError(processedError);
     }
-  }, [supportedNetworks]);
+  }, [getCoinbaseWallet, checkConnection, resetWalletState]);
+
+  const disconnect = useCallback(async () => {
+    try {
+      const ethereum = getCoinbaseWallet().getProvider();
+
+      if (ethereum) {
+        // Clear wallet permissions
+        await ethereum.request({
+          method: "wallet_requestPermissions",
+          params: [{ eth_accounts: {} }],
+        });
+
+        // Attempt to disconnect if the method exists
+        if (typeof ethereum.disconnect === "function") {
+          await ethereum.disconnect();
+        }
+
+        // Force clear the accounts
+        await ethereum.request({
+          method: "eth_accounts",
+        });
+      }
+    } catch (err) {
+      console.error("Error during wallet disconnection:", err);
+    } finally {
+      resetWalletState();
+    }
+  }, [getCoinbaseWallet, resetWalletState]);
+
+  const switchNetwork = useCallback(
+    async (networkKey: keyof typeof SUPPORTED_NETWORKS) => {
+      try {
+        const network = supportedNetworks[networkKey];
+        if (!network) {
+          throw new Error("Unsupported network selected");
+        }
+
+        const ethereum = getCoinbaseWallet().getProvider();
+        if (!ethereum) {
+          throw new Error("Ethereum provider unavailable");
+        }
+
+        await ethereum.request({
+          method: "wallet_switchEthereumChain",
+          params: [{ chainId: network.chainId }],
+        });
+
+        setChainId(parseInt(network.chainId, 16));
+        setError(null);
+      } catch (err) {
+        const processedError =
+          err instanceof Error ? err : new Error("Network switching failed");
+        console.error("Network Switch Error:", processedError);
+        setError(processedError);
+      }
+    },
+    [supportedNetworks, getCoinbaseWallet]
+  );
 
   return {
     connect,

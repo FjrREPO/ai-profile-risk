@@ -6,13 +6,29 @@ export const siteConfig = {
   navItems: [
     {
       label: "Home",
-      href: "/",
-    }
+      href: "/home",
+    },
+    {
+      label: "Genearte",
+      href: "/generate",
+    },
+    {
+      label: "Docs",
+      href: "/docs",
+    },
   ],
   navMenuItems: [
     {
       label: "Home",
-      href: "/profile",
+      href: "/home",
+    },
+    {
+      label: "Genearte",
+      href: "/generate",
+    },
+    {
+      label: "Docs",
+      href: "/docs",
     },
   ],
   links: {
